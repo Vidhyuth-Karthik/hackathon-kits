@@ -27,7 +27,7 @@ app = FastAPI(title="Hackathon Starter Kit API")
 # Space secret/variable in production, e.g.
 # "https://your-username-your-client-space.hf.space".
 CORS_ORIGINS = os.environ.get(
-    "CORS_ORIGINS", "https://hackathon-kit-seven.vercel.app/,http://localhost:5500,http://127.0.0.1:5500"
+    "CORS_ORIGINS", "https://hackathon-kit-seven.vercel.app,http://localhost:5500,http://127.0.0.1:5500"
 ).split(",")
 
 app.add_middleware(
