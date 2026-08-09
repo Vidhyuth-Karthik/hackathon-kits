@@ -2,9 +2,12 @@
 // home page (home.html). Both pages load this same file - each part
 // below only runs if the elements it needs are actually on the page.
 //
-// All requests go to the FastAPI server, which also serves this
-// file, so relative URLs like "/api/auth/login" just work - no need
-// to configure a base URL or deal with CORS.
+// The API is hosted separately from this frontend, so every request
+// needs the API's full base URL and "credentials: include" so the
+// session cookie is sent/received cross-origin. Once the API Space is
+// deployed, replace this with its https://*.hf.space URL.
+
+const API_BASE_URL = "http://localhost:8000";
 
 const messageEl = document.getElementById("message");
 
@@ -14,11 +17,11 @@ function showMessage(text, isError) {
   messageEl.className = "message " + (isError ? "error" : "success");
 }
 
-async function postJSON(url, data) {
-  const response = await fetch(url, {
+async function postJSON(path, data) {
+  const response = await fetch(API_BASE_URL + path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "same-origin", // send/receive the session cookie
+    credentials: "include", // send/receive the session cookie cross-origin
     body: JSON.stringify(data),
   });
 
@@ -82,7 +85,7 @@ const userIdDisplay = document.getElementById("user-id-display");
 const logoutButton = document.getElementById("logout-button");
 
 if (userIdDisplay) {
-  fetch("/api/auth/me", { credentials: "same-origin" })
+  fetch(API_BASE_URL + "/api/auth/me", { credentials: "include" })
     .then((response) => {
       if (!response.ok) throw new Error("Not logged in");
       return response.json();
@@ -97,7 +100,7 @@ if (userIdDisplay) {
 
 if (logoutButton) {
   logoutButton.addEventListener("click", async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    await fetch(API_BASE_URL + "/api/auth/logout", { method: "POST", credentials: "include" });
     window.location.href = "/index.html";
   });
 }

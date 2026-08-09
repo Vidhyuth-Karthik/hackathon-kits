@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel
 
-from database import get_connection
+from database import get_connection, row_to_dict
 from security import hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -61,7 +61,7 @@ def login(credentials: Credentials, response: Response):
     cursor.execute(
         "SELECT password_hash, password_salt FROM users WHERE user_id = ?", (user_id,)
     )
-    row = cursor.fetchone()
+    row = row_to_dict(cursor, cursor.fetchone())
 
     if row is None or not verify_password(password, row["password_salt"], row["password_hash"]):
         conn.close()
@@ -77,7 +77,13 @@ def login(credentials: Credentials, response: Response):
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,  # JavaScript can't read this cookie - reduces XSS risk
-        samesite="lax",
+        # The frontend is a different origin now, so this cookie must be sent
+        # cross-site. Browsers require SameSite=None to be paired with
+        # Secure - that's fine for a deployed (HTTPS) frontend/backend, and
+        # browsers special-case http://localhost as a "secure" origin too,
+        # so local dev keeps working without HTTPS.
+        samesite="none",
+        secure=True,
         max_age=60 * 60 * 24,  # 1 day, in seconds
     )
     return {"message": "Logged in", "user_id": user_id}
@@ -119,7 +125,7 @@ def get_current_user(session_token: Optional[str]) -> Optional[str]:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id FROM sessions WHERE token = ?", (session_token,))
-    row = cursor.fetchone()
+    row = row_to_dict(cursor, cursor.fetchone())
     conn.close()
 
     return row["user_id"] if row else None

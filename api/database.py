@@ -1,29 +1,46 @@
-# Handles the SQLite database connection and setup.
+# Handles the database connection and setup.
 #
-# This project uses Python's built-in `sqlite3` module, so there is
-# nothing extra to install for the database itself.
+# The database is hosted on Turso (a SQLite-compatible service) instead
+# of a local file, since this API deploys as a Docker Space on Hugging
+# Face - the container's disk is wiped on every restart, so anything
+# written to a local file wouldn't survive a redeploy. Create a free
+# database at https://turso.tech, then set TURSO_DATABASE_URL and
+# TURSO_AUTH_TOKEN - copy .env.example to .env and fill them in for
+# local dev, or set them as Space secrets in production.
 
-import sqlite3
-from pathlib import Path
+import os
 
-# The database file lives in the top-level "data" folder so it's easy
-# to find, back up, or delete while you're experimenting.
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "app.db"
+import libsql
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TURSO_DATABASE_URL = os.environ["TURSO_DATABASE_URL"]
+TURSO_AUTH_TOKEN = os.environ["TURSO_AUTH_TOKEN"]
 
 
 def get_connection():
-    """Open a new connection to the SQLite database.
+    """Open a new connection to the Turso database.
 
     Each request opens and closes its own connection. That's a bit
     less "efficient" than sharing one connection, but it's much
     easier to reason about when you're learning - no shared state,
     no threading surprises.
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # lets us read columns by name, e.g. row["user_id"]
-    return conn
+    return libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+
+
+def row_to_dict(cursor, row):
+    """Turn a plain result row into a dict keyed by column name.
+
+    Unlike Python's built-in sqlite3 module, libsql's cursor returns
+    rows as plain tuples with no name-based access - this rebuilds
+    that convenience (`row["user_id"]`) from cursor.description.
+    """
+    if row is None:
+        return None
+    columns = [column[0] for column in cursor.description]
+    return dict(zip(columns, row))
 
 
 def init_db():
